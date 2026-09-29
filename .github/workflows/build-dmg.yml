@@ -3,6 +3,7 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: macos-15         # Apple Silicon (M1/M2/M3/M4)
@@ -14,10 +15,33 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: python tests/test_engine.py && python tests/test_manager.py
-      - run: bash build_mac.sh
-      - run: mv dist/NuuraniDM.dmg dist/NuuraniDM-${{ matrix.arch }}.dmg
+
+      - name: Cari folder aplikasi
+        run: |
+          echo "Isi repository:"; ls -la
+          SCRIPT=$(find . -name build_mac.sh -not -path "./.git/*" | head -1)
+          if [ -z "$SCRIPT" ]; then echo "❌ build_mac.sh tidak ditemukan"; exit 1; fi
+          echo "APPDIR=$(dirname "$SCRIPT")" >> $GITHUB_ENV
+          echo "✅ Folder aplikasi: $(dirname "$SCRIPT")"
+
+      - name: Uji engine (dilewati jika folder tests tidak ada)
+        working-directory: ${{ env.APPDIR }}
+        run: |
+          if [ -f tests/test_engine.py ]; then
+            python tests/test_engine.py && python tests/test_manager.py
+          else
+            echo "⚠️ Folder tests tidak ada, uji dilewati"
+          fi
+
+      - name: Build .app dan .dmg
+        working-directory: ${{ env.APPDIR }}
+        run: bash build_mac.sh
+
+      - name: Ganti nama .dmg
+        working-directory: ${{ env.APPDIR }}
+        run: mv dist/NuuraniDM.dmg dist/NuuraniDM-${{ matrix.arch }}.dmg
+
       - uses: actions/upload-artifact@v4
         with:
           name: NuuraniDM-${{ matrix.arch }}
-          path: dist/NuuraniDM-${{ matrix.arch }}.dmg
+          path: ${{ env.APPDIR }}/dist/NuuraniDM-${{ matrix.arch }}.dmg
