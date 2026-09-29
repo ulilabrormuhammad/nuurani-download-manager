@@ -1,0 +1,23 @@
+name: Build Nuurani DM (.dmg)
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-15         # Apple Silicon (M1/M2/M3/M4)
+            arch: arm64
+          - os: macos-15-intel   # Intel
+            arch: intel
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python tests/test_engine.py && python tests/test_manager.py
+      - run: bash build_mac.sh
+      - run: mv dist/NuuraniDM.dmg dist/NuuraniDM-${{ matrix.arch }}.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NuuraniDM-${{ matrix.arch }}
+          path: dist/NuuraniDM-${{ matrix.arch }}.dmg
